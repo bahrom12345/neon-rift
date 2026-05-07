@@ -1,0 +1,1298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neon Rift</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #eef7ff;
+      --muted: #9fb0bd;
+      --panel: rgba(9, 15, 24, 0.74);
+      --line: rgba(255, 255, 255, 0.16);
+      --cyan: #31d7ff;
+      --gold: #ffc857;
+      --red: #ff5d73;
+      --green: #70f2a4;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #050910;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+      background: #050910;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 16px 16px auto 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+      pointer-events: none;
+    }
+
+    .stats,
+    .controls,
+    .upgrade,
+    .start,
+    .game-over {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+    }
+
+    .stats {
+      width: min(520px, calc(100vw - 32px));
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .stat-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .label {
+      width: 58px;
+      flex: 0 0 58px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .bar {
+      height: 9px;
+      flex: 1;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .fill {
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--green);
+      box-shadow: 0 0 18px currentColor;
+      transition: width 120ms linear;
+    }
+
+    .xp .fill {
+      width: 0;
+      background: var(--cyan);
+    }
+
+    .numbers {
+      display: grid;
+      grid-template-columns: repeat(4, auto);
+      gap: 12px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .numbers strong {
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .controls {
+      width: 246px;
+      padding: 12px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    kbd {
+      display: inline-grid;
+      min-width: 22px;
+      height: 22px;
+      place-items: center;
+      margin: 0 2px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom-color: rgba(255, 255, 255, 0.36);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 800;
+    }
+
+    .center-layer {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      pointer-events: none;
+    }
+
+    .start,
+    .game-over,
+    .upgrade {
+      width: min(620px, calc(100vw - 32px));
+      border-radius: 8px;
+      padding: 22px;
+      pointer-events: auto;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      font-size: clamp(34px, 8vw, 72px);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: clamp(28px, 5vw, 46px);
+    }
+
+    p {
+      margin: 12px 0 0;
+      max-width: 58ch;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 800;
+      letter-spacing: 0;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    button.primary {
+      border-color: rgba(49, 215, 255, 0.62);
+      background: linear-gradient(135deg, rgba(49, 215, 255, 0.96), rgba(112, 242, 164, 0.9));
+      color: #031016;
+      box-shadow: 0 0 32px rgba(49, 215, 255, 0.22);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .upgrade {
+      display: none;
+    }
+
+    .leaderboard {
+      margin-top: 18px;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+    }
+
+    .leaderboard h3 {
+      margin: 0 0 10px;
+      color: var(--ink);
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+
+    .leaderboard ol {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding-left: 24px;
+      color: var(--muted);
+    }
+
+    .leaderboard li {
+      padding-left: 4px;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .leaderboard strong {
+      color: var(--ink);
+    }
+
+    .score-form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    input {
+      min-width: 0;
+      min-height: 42px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 700;
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: rgba(49, 215, 255, 0.7);
+      box-shadow: 0 0 0 3px rgba(49, 215, 255, 0.16);
+    }
+
+    .upgrade.visible,
+    .start.hidden,
+    .game-over.visible {
+      display: block;
+    }
+
+    .start.hidden,
+    .game-over {
+      display: none;
+    }
+
+    .choices {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .choice {
+      min-height: 128px;
+      padding: 14px;
+      text-align: left;
+    }
+
+    .choice b {
+      display: block;
+      color: var(--ink);
+      font-size: 16px;
+    }
+
+    .choice span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 760px) {
+      .hud {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        display: none;
+      }
+
+      .numbers {
+        grid-template-columns: repeat(2, auto);
+      }
+
+      .choices {
+        grid-template-columns: 1fr;
+      }
+
+      .score-form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Neon Rift game canvas"></canvas>
+
+  <div class="hud">
+    <section class="stats" aria-label="Game stats">
+      <div class="stat-line">
+        <div class="label">Hull</div>
+        <div class="bar"><div id="healthFill" class="fill"></div></div>
+      </div>
+      <div class="stat-line xp" style="margin-top: 8px;">
+        <div class="label">Charge</div>
+        <div class="bar"><div id="xpFill" class="fill"></div></div>
+      </div>
+      <div class="numbers">
+        <span>Score <strong id="score">0</strong></span>
+        <span>Wave <strong id="wave">1</strong></span>
+        <span>Level <strong id="level">1</strong></span>
+        <span>Combo <strong id="combo">x1</strong></span>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to move</div>
+      <div style="margin-top: 8px;">Aim with mouse. Hold <kbd>Space</kbd> for boost. Press <kbd>P</kbd> to pause.</div>
+    </section>
+  </div>
+
+  <div class="center-layer">
+    <section id="start" class="start">
+      <h1>Neon Rift</h1>
+      <p>Pilot a fast little ship through enemy waves, collect glowing cores, level up mid-fight, and survive as the rift gets louder.</p>
+      <div class="actions">
+        <button id="startButton" class="primary">Start Game</button>
+        <button id="howButton">Mouse + Keyboard</button>
+      </div>
+      <div class="leaderboard">
+        <h3>Top Pilots</h3>
+        <ol id="startLeaderboard"></ol>
+      </div>
+    </section>
+
+    <section id="upgrade" class="upgrade">
+      <h2>Choose Upgrade</h2>
+      <p>Your ship absorbed enough charge. Pick one upgrade and dive back in.</p>
+      <div id="choices" class="choices"></div>
+    </section>
+
+    <section id="gameOver" class="game-over">
+      <h2>Rift Closed</h2>
+      <p id="finalStats"></p>
+      <form id="scoreForm" class="score-form">
+        <input id="playerName" maxlength="14" autocomplete="off" placeholder="Pilot name" aria-label="Pilot name">
+        <button id="saveScoreButton" class="primary" type="submit">Save Score</button>
+      </form>
+      <div class="leaderboard">
+        <h3>Leaderboard</h3>
+        <ol id="leaderboardList"></ol>
+      </div>
+      <div class="actions">
+        <button id="restartButton" class="primary">Play Again</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const ui = {
+      healthFill: document.getElementById("healthFill"),
+      xpFill: document.getElementById("xpFill"),
+      score: document.getElementById("score"),
+      wave: document.getElementById("wave"),
+      level: document.getElementById("level"),
+      combo: document.getElementById("combo"),
+      start: document.getElementById("start"),
+      upgrade: document.getElementById("upgrade"),
+      choices: document.getElementById("choices"),
+      gameOver: document.getElementById("gameOver"),
+      finalStats: document.getElementById("finalStats"),
+      scoreForm: document.getElementById("scoreForm"),
+      playerName: document.getElementById("playerName"),
+      saveScoreButton: document.getElementById("saveScoreButton"),
+      leaderboardList: document.getElementById("leaderboardList"),
+      startLeaderboard: document.getElementById("startLeaderboard"),
+      startButton: document.getElementById("startButton"),
+      restartButton: document.getElementById("restartButton"),
+      howButton: document.getElementById("howButton")
+    };
+
+    const TAU = Math.PI * 2;
+    const keys = new Set();
+    const mouse = { x: 0, y: 0, active: false };
+    const world = {
+      w: 0,
+      h: 0,
+      time: 0,
+      shake: 0,
+      running: false,
+      paused: false,
+      choosing: false,
+      over: false,
+      stars: [],
+      enemies: [],
+      bullets: [],
+      enemyShots: [],
+      cores: [],
+      particles: [],
+      waveTimer: 0,
+      spawnTimer: 0,
+      score: 0,
+      scoreSubmitted: false,
+      wave: 1,
+      level: 1,
+      xp: 0,
+      xpNext: 7,
+      combo: 1,
+      comboTimer: 0
+    };
+
+    const player = {
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      r: 16,
+      maxHealth: 120,
+      health: 120,
+      speed: 540,
+      friction: 0.9,
+      fireRate: 0.12,
+      fireTimer: 0,
+      damage: 16,
+      bullets: 1,
+      spread: 0.16,
+      magnet: 120,
+      boostTimer: 0,
+      invulnerable: 0,
+      invulnerableDuration: 0.65
+    };
+
+    const upgrades = [
+      { name: "Twin Lances", desc: "+1 projectile per burst.", apply: () => player.bullets += 1 },
+      { name: "Hotter Core", desc: "Shots hit 30% harder.", apply: () => player.damage *= 1.3 },
+      { name: "Pulse Engine", desc: "Movement speed rises by 16%.", apply: () => player.speed *= 1.16 },
+      { name: "Quick Trigger", desc: "Fire rate improves by 18%.", apply: () => player.fireRate *= 0.82 },
+      { name: "Repair Foam", desc: "Restore hull and raise max hull.", apply: () => {
+        player.maxHealth += 25;
+        player.health = Math.min(player.maxHealth, player.health + 60);
+      }},
+      { name: "Core Magnet", desc: "Pull charge cores from farther away.", apply: () => player.magnet += 70 },
+      { name: "Wide Arc", desc: "More spread for crowd control.", apply: () => player.spread += 0.07 },
+      { name: "Phase Plating", desc: "Longer invulnerability after hits.", apply: () => player.invulnerableDuration += 0.35 }
+    ];
+
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      canvas.width = Math.floor(innerWidth * dpr);
+      canvas.height = Math.floor(innerHeight * dpr);
+      canvas.style.width = innerWidth + "px";
+      canvas.style.height = innerHeight + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      world.w = innerWidth;
+      world.h = innerHeight;
+      if (!world.running) {
+        player.x = world.w / 2;
+        player.y = world.h / 2;
+      }
+      makeStars();
+    }
+
+    function makeStars() {
+      const count = Math.floor((world.w * world.h) / 7200);
+      world.stars = Array.from({ length: count }, () => ({
+        x: Math.random() * world.w,
+        y: Math.random() * world.h,
+        z: 0.35 + Math.random() * 1.4,
+        twinkle: Math.random() * TAU
+      }));
+    }
+
+    function resetGame() {
+      Object.assign(world, {
+        time: 0,
+        shake: 0,
+        running: true,
+        paused: false,
+        choosing: false,
+        over: false,
+        enemies: [],
+        bullets: [],
+        enemyShots: [],
+        cores: [],
+        particles: [],
+        waveTimer: 0,
+        spawnTimer: 0.4,
+        score: 0,
+        scoreSubmitted: false,
+        wave: 1,
+        level: 1,
+        xp: 0,
+        xpNext: 7,
+        combo: 1,
+        comboTimer: 0
+      });
+
+      Object.assign(player, {
+        x: world.w / 2,
+        y: world.h / 2,
+        vx: 0,
+        vy: 0,
+        r: 16,
+        maxHealth: 120,
+        health: 120,
+        speed: 540,
+        friction: 0.9,
+        fireRate: 0.12,
+        fireTimer: 0,
+        damage: 16,
+        bullets: 1,
+        spread: 0.16,
+        magnet: 120,
+        boostTimer: 0,
+        invulnerable: 0,
+        invulnerableDuration: 0.65
+      });
+
+      ui.start.classList.add("hidden");
+      ui.gameOver.classList.remove("visible");
+      ui.upgrade.classList.remove("visible");
+      ui.saveScoreButton.disabled = false;
+      ui.saveScoreButton.textContent = "Save Score";
+      spawnWaveBurst(8);
+      updateHud();
+    }
+
+    function rand(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function distance(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function angleTo(a, b) {
+      return Math.atan2(b.y - a.y, b.x - a.x);
+    }
+
+    function spawnEnemy(type = null) {
+      const side = Math.floor(Math.random() * 4);
+      const margin = 80;
+      let x = rand(-margin, world.w + margin);
+      let y = rand(-margin, world.h + margin);
+
+      if (side === 0) y = -margin;
+      if (side === 1) x = world.w + margin;
+      if (side === 2) y = world.h + margin;
+      if (side === 3) x = -margin;
+
+      const chosen = type || weightedEnemyType();
+      const stats = {
+        chaser: { r: 15, hp: 36 + world.wave * 4, speed: rand(105, 145), color: "#ff5d73", score: 80 },
+        bruiser: { r: 26, hp: 96 + world.wave * 12, speed: rand(62, 82), color: "#ffc857", score: 190 },
+        skitter: { r: 10, hp: 18 + world.wave * 3, speed: rand(190, 240), color: "#c77dff", score: 60 },
+        turret: { r: 20, hp: 64 + world.wave * 7, speed: rand(46, 60), color: "#31d7ff", score: 150 }
+      }[chosen];
+
+      world.enemies.push({
+        x,
+        y,
+        vx: 0,
+        vy: 0,
+        type: chosen,
+        hp: stats.hp,
+        maxHp: stats.hp,
+        r: stats.r,
+        speed: stats.speed,
+        color: stats.color,
+        score: stats.score,
+        shootTimer: rand(0.4, 1.8),
+        wobble: rand(0, TAU)
+      });
+    }
+
+    function weightedEnemyType() {
+      const roll = Math.random();
+      if (world.wave < 3) return roll < 0.75 ? "chaser" : "skitter";
+      if (roll < 0.48) return "chaser";
+      if (roll < 0.68) return "skitter";
+      if (roll < 0.86) return "turret";
+      return "bruiser";
+    }
+
+    function spawnWaveBurst(amount) {
+      for (let i = 0; i < amount; i++) spawnEnemy();
+    }
+
+    function fireBullet() {
+      const target = mouse.active ? mouse : { x: player.x, y: player.y - 1 };
+      const base = angleTo(player, target);
+      const count = player.bullets;
+      const spreadTotal = player.spread * (count - 1);
+
+      for (let i = 0; i < count; i++) {
+        const angle = base - spreadTotal / 2 + player.spread * i;
+        const speed = 760;
+        world.bullets.push({
+          x: player.x + Math.cos(angle) * 20,
+          y: player.y + Math.sin(angle) * 20,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          r: 4,
+          life: 0.84,
+          damage: player.damage,
+          color: "#b7f7ff"
+        });
+      }
+
+      addParticles(player.x, player.y, "#31d7ff", 5, 120, 0.18);
+    }
+
+    function enemyShoot(enemy) {
+      const angle = angleTo(enemy, player);
+      const speed = 260 + world.wave * 8;
+      world.enemyShots.push({
+        x: enemy.x,
+        y: enemy.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: 5,
+        life: 4.2,
+        damage: 12,
+        color: enemy.color
+      });
+    }
+
+    function addParticles(x, y, color, count, speed = 220, life = 0.5) {
+      for (let i = 0; i < count; i++) {
+        const angle = rand(0, TAU);
+        const power = rand(speed * 0.25, speed);
+        world.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * power,
+          vy: Math.sin(angle) * power,
+          r: rand(1.5, 4),
+          life: rand(life * 0.45, life),
+          maxLife: life,
+          color
+        });
+      }
+    }
+
+    function dropCores(enemy) {
+      const count = enemy.type === "bruiser" ? 4 : enemy.type === "turret" ? 3 : 2;
+      for (let i = 0; i < count; i++) {
+        world.cores.push({
+          x: enemy.x + rand(-8, 8),
+          y: enemy.y + rand(-8, 8),
+          vx: rand(-120, 120),
+          vy: rand(-120, 120),
+          r: 7,
+          value: 1
+        });
+      }
+    }
+
+    function hitPlayer(amount) {
+      if (player.invulnerable > 0) return;
+      player.health -= amount;
+      player.invulnerable = player.invulnerableDuration;
+      world.shake = Math.max(world.shake, 12);
+      addParticles(player.x, player.y, "#ff5d73", 28, 360, 0.6);
+      if (player.health <= 0) endGame();
+    }
+
+    function gainXp(value) {
+      world.xp += value;
+      while (world.xp >= world.xpNext) {
+        world.xp -= world.xpNext;
+        world.level += 1;
+        world.xpNext = Math.floor(world.xpNext * 1.35 + 4);
+        openUpgrade();
+      }
+    }
+
+    function openUpgrade() {
+      world.choosing = true;
+      world.paused = true;
+      ui.choices.innerHTML = "";
+      const picks = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 3);
+      for (const item of picks) {
+        const button = document.createElement("button");
+        button.className = "choice";
+        button.innerHTML = `<b>${item.name}</b><span>${item.desc}</span>`;
+        button.addEventListener("click", () => {
+          item.apply();
+          world.choosing = false;
+          world.paused = false;
+          ui.upgrade.classList.remove("visible");
+          updateHud();
+        });
+        ui.choices.appendChild(button);
+      }
+      ui.upgrade.classList.add("visible");
+    }
+
+    function endGame() {
+      world.running = false;
+      world.over = true;
+      ui.finalStats.textContent = `Final score ${Math.floor(world.score)}. You reached wave ${world.wave} and level ${world.level}.`;
+      ui.playerName.value = localStorage.getItem("neonRiftPilotName") || "";
+      renderLeaderboard(ui.leaderboardList);
+      ui.gameOver.classList.add("visible");
+      setTimeout(() => ui.playerName.focus(), 60);
+    }
+
+    const LEADERBOARD_API = "/.netlify/functions/leaderboard";
+
+    function canUseSharedLeaderboard() {
+      return location.protocol === "http:" || location.protocol === "https:";
+    }
+
+    function loadLocalLeaderboard() {
+      try {
+        return JSON.parse(localStorage.getItem("neonRiftLeaderboard")) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveLocalLeaderboard(entries) {
+      localStorage.setItem("neonRiftLeaderboard", JSON.stringify(entries.slice(0, 10)));
+    }
+
+    async function loadLeaderboard() {
+      if (canUseSharedLeaderboard()) {
+        const response = await fetch(LEADERBOARD_API, {
+          headers: { "Accept": "application/json" }
+        });
+
+        if (!response.ok) throw new Error("Leaderboard request failed");
+        const data = await response.json();
+        return Array.isArray(data.scores) ? data.scores : [];
+      }
+
+      return loadLocalLeaderboard();
+    }
+
+    async function saveLeaderboardEntry(entry) {
+      if (canUseSharedLeaderboard()) {
+        const response = await fetch(LEADERBOARD_API, {
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(entry)
+        });
+
+        if (!response.ok) throw new Error("Score save failed");
+        const data = await response.json();
+        return Array.isArray(data.scores) ? data.scores : [];
+      }
+
+      const entries = loadLocalLeaderboard();
+      entries.push(entry);
+      entries.sort((a, b) => b.score - a.score || b.wave - a.wave || b.level - a.level);
+      saveLocalLeaderboard(entries);
+      return entries;
+    }
+
+    async function submitScore(event) {
+      event.preventDefault();
+      if (!world.over || world.scoreSubmitted) return;
+
+      const fallback = "Pilot";
+      const name = (ui.playerName.value || fallback).trim().slice(0, 14) || fallback;
+      localStorage.setItem("neonRiftPilotName", name);
+
+      const entry = {
+        name,
+        score: Math.floor(world.score),
+        wave: world.wave,
+        level: world.level,
+        date: new Date().toLocaleDateString()
+      };
+
+      ui.saveScoreButton.disabled = true;
+      ui.saveScoreButton.textContent = "Saving";
+
+      try {
+        const entries = await saveLeaderboardEntry(entry);
+        world.scoreSubmitted = true;
+        ui.saveScoreButton.textContent = canUseSharedLeaderboard() ? "Saved Online" : "Saved";
+        renderLeaderboard(ui.leaderboardList, entries);
+        renderLeaderboard(ui.startLeaderboard, entries);
+      } catch {
+        const entries = loadLocalLeaderboard();
+        entries.push(entry);
+        entries.sort((a, b) => b.score - a.score || b.wave - a.wave || b.level - a.level);
+        saveLocalLeaderboard(entries);
+        world.scoreSubmitted = true;
+        ui.saveScoreButton.textContent = "Saved Local";
+        renderLeaderboard(ui.leaderboardList, entries);
+        renderLeaderboard(ui.startLeaderboard, entries);
+      }
+    }
+
+    async function renderLeaderboard(target, suppliedEntries = null) {
+      target.innerHTML = "";
+      const loading = document.createElement("li");
+      loading.textContent = "Loading scores...";
+      target.appendChild(loading);
+
+      let entries = suppliedEntries;
+      if (!entries) {
+        try {
+          entries = await loadLeaderboard();
+        } catch {
+          entries = loadLocalLeaderboard();
+        }
+      }
+
+      target.innerHTML = "";
+
+      if (!entries.length) {
+        const empty = document.createElement("li");
+        empty.textContent = "No scores yet.";
+        target.appendChild(empty);
+        return;
+      }
+
+      for (const entry of entries.slice(0, 8)) {
+        const item = document.createElement("li");
+        item.innerHTML = `<strong>${escapeHtml(entry.name)}</strong> ${Number(entry.score).toLocaleString()} pts - wave ${entry.wave} - level ${entry.level}`;
+        target.appendChild(item);
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[char]);
+    }
+
+    function update(dt) {
+      if (!world.running || world.paused) return;
+
+      world.time += dt;
+      world.waveTimer += dt;
+      world.spawnTimer -= dt;
+      player.fireTimer -= dt;
+      player.invulnerable = Math.max(0, player.invulnerable - dt);
+      world.comboTimer = Math.max(0, world.comboTimer - dt);
+      if (world.comboTimer <= 0) world.combo = 1;
+
+      if (world.waveTimer > 22) {
+        world.waveTimer = 0;
+        world.wave += 1;
+        spawnWaveBurst(5 + world.wave * 2);
+      }
+
+      if (world.spawnTimer <= 0) {
+        world.spawnTimer = Math.max(0.32, 1.2 - world.wave * 0.045);
+        spawnEnemy();
+      }
+
+      movePlayer(dt);
+      if (player.fireTimer <= 0) {
+        fireBullet();
+        player.fireTimer = player.fireRate;
+      }
+
+      updateBullets(dt);
+      updateEnemyShots(dt);
+      updateEnemies(dt);
+      updateCores(dt);
+      updateParticles(dt);
+      updateHud();
+    }
+
+    function movePlayer(dt) {
+      let ax = 0;
+      let ay = 0;
+      if (keys.has("w") || keys.has("arrowup")) ay -= 1;
+      if (keys.has("s") || keys.has("arrowdown")) ay += 1;
+      if (keys.has("a") || keys.has("arrowleft")) ax -= 1;
+      if (keys.has("d") || keys.has("arrowright")) ax += 1;
+
+      const moving = ax || ay;
+      if (moving) {
+        const len = Math.hypot(ax, ay) || 1;
+        ax /= len;
+        ay /= len;
+      }
+
+      const boosting = keys.has(" ") && moving;
+      const speed = player.speed * (boosting ? 1.55 : 1);
+      player.vx += ax * speed * dt;
+      player.vy += ay * speed * dt;
+      player.vx *= Math.pow(player.friction, dt * 60);
+      player.vy *= Math.pow(player.friction, dt * 60);
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+      player.x = clamp(player.x, player.r + 8, world.w - player.r - 8);
+      player.y = clamp(player.y, player.r + 8, world.h - player.r - 8);
+
+      if (boosting) {
+        player.boostTimer += dt;
+        addParticles(player.x - player.vx * 0.018, player.y - player.vy * 0.018, "#70f2a4", 2, 150, 0.25);
+      }
+    }
+
+    function updateBullets(dt) {
+      for (const bullet of world.bullets) {
+        bullet.x += bullet.vx * dt;
+        bullet.y += bullet.vy * dt;
+        bullet.life -= dt;
+      }
+      world.bullets = world.bullets.filter(b => b.life > 0 && b.x > -50 && b.x < world.w + 50 && b.y > -50 && b.y < world.h + 50);
+    }
+
+    function updateEnemyShots(dt) {
+      for (const shot of world.enemyShots) {
+        shot.x += shot.vx * dt;
+        shot.y += shot.vy * dt;
+        shot.life -= dt;
+        if (distance(shot, player) < shot.r + player.r) {
+          shot.life = 0;
+          hitPlayer(shot.damage);
+        }
+      }
+      world.enemyShots = world.enemyShots.filter(s => s.life > 0);
+    }
+
+    function updateEnemies(dt) {
+      for (const enemy of world.enemies) {
+        const angle = angleTo(enemy, player);
+        const wobble = Math.sin(world.time * 4 + enemy.wobble) * 0.55;
+        const steer = enemy.type === "skitter" ? angle + wobble : angle;
+        enemy.vx += Math.cos(steer) * enemy.speed * dt * 5;
+        enemy.vy += Math.sin(steer) * enemy.speed * dt * 5;
+        enemy.vx *= Math.pow(0.84, dt * 60);
+        enemy.vy *= Math.pow(0.84, dt * 60);
+        enemy.x += enemy.vx * dt;
+        enemy.y += enemy.vy * dt;
+
+        if (enemy.type === "turret") {
+          enemy.shootTimer -= dt;
+          if (enemy.shootTimer <= 0) {
+            enemyShoot(enemy);
+            enemy.shootTimer = rand(1.2, 2.2);
+          }
+        }
+
+        if (distance(enemy, player) < enemy.r + player.r) {
+          hitPlayer(enemy.type === "bruiser" ? 28 : 16);
+          enemy.hp -= 30;
+          enemy.vx -= Math.cos(angle) * 520;
+          enemy.vy -= Math.sin(angle) * 520;
+        }
+
+        for (const bullet of world.bullets) {
+          if (bullet.life > 0 && distance(enemy, bullet) < enemy.r + bullet.r) {
+            bullet.life = 0;
+            enemy.hp -= bullet.damage;
+            enemy.vx += Math.cos(Math.atan2(bullet.vy, bullet.vx)) * 90;
+            enemy.vy += Math.sin(Math.atan2(bullet.vy, bullet.vx)) * 90;
+            addParticles(bullet.x, bullet.y, enemy.color, 7, 160, 0.36);
+          }
+        }
+      }
+
+      const survivors = [];
+      for (const enemy of world.enemies) {
+        if (enemy.hp <= 0) {
+          world.score += enemy.score * world.combo;
+          world.combo = Math.min(9, world.combo + 0.25);
+          world.comboTimer = 2.8;
+          world.shake = Math.max(world.shake, enemy.r * 0.28);
+          addParticles(enemy.x, enemy.y, enemy.color, enemy.type === "bruiser" ? 42 : 24, 360, 0.72);
+          dropCores(enemy);
+        } else {
+          survivors.push(enemy);
+        }
+      }
+      world.enemies = survivors;
+    }
+
+    function updateCores(dt) {
+      for (const core of world.cores) {
+        const d = distance(core, player);
+        if (d < player.magnet) {
+          const a = angleTo(core, player);
+          const pull = (1 - d / player.magnet) * 780;
+          core.vx += Math.cos(a) * pull * dt;
+          core.vy += Math.sin(a) * pull * dt;
+        }
+        core.vx *= Math.pow(0.9, dt * 60);
+        core.vy *= Math.pow(0.9, dt * 60);
+        core.x += core.vx * dt;
+        core.y += core.vy * dt;
+        if (d < core.r + player.r) {
+          core.value = 0;
+          gainXp(1);
+          addParticles(core.x, core.y, "#70f2a4", 8, 180, 0.32);
+        }
+      }
+      world.cores = world.cores.filter(c => c.value > 0);
+    }
+
+    function updateParticles(dt) {
+      for (const p of world.particles) {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vx *= Math.pow(0.92, dt * 60);
+        p.vy *= Math.pow(0.92, dt * 60);
+        p.life -= dt;
+      }
+      world.particles = world.particles.filter(p => p.life > 0);
+      world.shake = Math.max(0, world.shake - dt * 34);
+    }
+
+    function draw() {
+      const sx = world.shake ? rand(-world.shake, world.shake) : 0;
+      const sy = world.shake ? rand(-world.shake, world.shake) : 0;
+      ctx.save();
+      ctx.clearRect(0, 0, world.w, world.h);
+      ctx.translate(sx, sy);
+      drawBackground();
+      drawCores();
+      drawBullets();
+      drawEnemies();
+      drawPlayer();
+      drawParticles();
+      ctx.restore();
+
+      if (world.paused && !world.choosing && world.running) {
+        ctx.save();
+        ctx.fillStyle = "rgba(5, 9, 16, 0.48)";
+        ctx.fillRect(0, 0, world.w, world.h);
+        ctx.fillStyle = "#eef7ff";
+        ctx.font = "800 48px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText("Paused", world.w / 2, world.h / 2);
+        ctx.restore();
+      }
+    }
+
+    function drawBackground() {
+      const gradient = ctx.createRadialGradient(world.w * 0.5, world.h * 0.45, 80, world.w * 0.5, world.h * 0.5, Math.max(world.w, world.h));
+      gradient.addColorStop(0, "#10233a");
+      gradient.addColorStop(0.45, "#07111d");
+      gradient.addColorStop(1, "#03060b");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, world.w, world.h);
+
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      for (const star of world.stars) {
+        const drift = world.time * 8 * star.z;
+        let x = (star.x - drift) % world.w;
+        if (x < 0) x += world.w;
+        const glow = 0.45 + Math.sin(world.time * 2 + star.twinkle) * 0.25;
+        ctx.fillStyle = `rgba(238, 247, 255, ${glow})`;
+        ctx.beginPath();
+        ctx.arc(x, star.y, star.z, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = "#31d7ff";
+      ctx.lineWidth = 1;
+      const grid = 56;
+      const offset = (world.time * 18) % grid;
+      for (let x = -grid + offset; x < world.w + grid; x += grid) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + world.h * 0.22, world.h);
+        ctx.stroke();
+      }
+      for (let y = -grid + offset; y < world.h + grid; y += grid) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(world.w, y + world.w * 0.08);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawPlayer() {
+      const aim = angleTo(player, mouse.active ? mouse : { x: player.x + 1, y: player.y });
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      ctx.rotate(aim);
+      ctx.globalAlpha = player.invulnerable > 0 && Math.sin(world.time * 34) > 0 ? 0.45 : 1;
+      ctx.shadowColor = "#31d7ff";
+      ctx.shadowBlur = 22;
+      ctx.fillStyle = "#eef7ff";
+      ctx.beginPath();
+      ctx.moveTo(24, 0);
+      ctx.lineTo(-16, -13);
+      ctx.lineTo(-8, 0);
+      ctx.lineTo(-16, 13);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowColor = "#70f2a4";
+      ctx.fillStyle = "#70f2a4";
+      ctx.beginPath();
+      ctx.arc(-4, 0, 5 + Math.sin(world.time * 12) * 1.5, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawEnemies() {
+      for (const enemy of world.enemies) {
+        ctx.save();
+        ctx.translate(enemy.x, enemy.y);
+        ctx.rotate(world.time * (enemy.type === "skitter" ? 4 : 1.4) + enemy.wobble);
+        ctx.shadowColor = enemy.color;
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = enemy.color;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+        ctx.lineWidth = 3;
+        const sides = enemy.type === "bruiser" ? 6 : enemy.type === "turret" ? 4 : 3;
+        ctx.beginPath();
+        for (let i = 0; i < sides; i++) {
+          const a = (i / sides) * TAU;
+          const r = enemy.r * (i % 2 ? 0.82 : 1);
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        const barW = enemy.r * 2;
+        ctx.fillStyle = "rgba(255,255,255,0.13)";
+        ctx.fillRect(enemy.x - barW / 2, enemy.y - enemy.r - 12, barW, 4);
+        ctx.fillStyle = enemy.color;
+        ctx.fillRect(enemy.x - barW / 2, enemy.y - enemy.r - 12, barW * Math.max(0, enemy.hp / enemy.maxHp), 4);
+      }
+    }
+
+    function drawBullets() {
+      for (const bullet of world.bullets) {
+        ctx.save();
+        ctx.shadowColor = bullet.color;
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = bullet.color;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.r, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      for (const shot of world.enemyShots) {
+        ctx.save();
+        ctx.shadowColor = shot.color;
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = shot.color;
+        ctx.beginPath();
+        ctx.arc(shot.x, shot.y, shot.r, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawCores() {
+      for (const core of world.cores) {
+        ctx.save();
+        ctx.shadowColor = "#70f2a4";
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = "#70f2a4";
+        ctx.beginPath();
+        ctx.arc(core.x, core.y, core.r + Math.sin(world.time * 8 + core.x) * 1.2, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawParticles() {
+      for (const p of world.particles) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function updateHud() {
+      ui.healthFill.style.width = `${clamp(player.health / player.maxHealth, 0, 1) * 100}%`;
+      ui.xpFill.style.width = `${clamp(world.xp / world.xpNext, 0, 1) * 100}%`;
+      ui.score.textContent = Math.floor(world.score).toLocaleString();
+      ui.wave.textContent = world.wave;
+      ui.level.textContent = world.level;
+      ui.combo.textContent = `x${world.combo.toFixed(world.combo % 1 ? 2 : 0)}`;
+    }
+
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.033, (now - last) / 1000);
+      last = now;
+      update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("mousemove", event => {
+      mouse.x = event.clientX;
+      mouse.y = event.clientY;
+      mouse.active = true;
+    });
+    window.addEventListener("mousedown", event => {
+      mouse.x = event.clientX;
+      mouse.y = event.clientY;
+      mouse.active = true;
+    });
+    window.addEventListener("keydown", event => {
+      const key = event.key.toLowerCase();
+      keys.add(key);
+      if (key === "p" && world.running && !world.choosing) {
+        world.paused = !world.paused;
+      }
+      if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+        event.preventDefault();
+      }
+    });
+    window.addEventListener("keyup", event => keys.delete(event.key.toLowerCase()));
+
+    ui.startButton.addEventListener("click", resetGame);
+    ui.restartButton.addEventListener("click", resetGame);
+    ui.scoreForm.addEventListener("submit", submitScore);
+    ui.howButton.addEventListener("click", () => {
+      ui.howButton.textContent = "WASD Move, Mouse Aim, Space Boost";
+      setTimeout(() => ui.howButton.textContent = "Mouse + Keyboard", 2200);
+    });
+
+    resize();
+    renderLeaderboard(ui.startLeaderboard);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
